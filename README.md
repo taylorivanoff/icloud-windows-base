@@ -21,7 +21,7 @@ require('icloud-windows-base').run({
 
 ```json
 "dependencies": {
-  "icloud-windows-base": "^1.0.0",
+  "icloud-windows-base": "^1.0.12",
   "electron-store": "^8.2.0",
   "electron-updater": "^6.1.8"
 }
@@ -29,23 +29,25 @@ require('icloud-windows-base').run({
 
 Keep in each app: `splash.html`, `icon.png`, `installer.nsh`, and app-specific `package.json` (appId, productName, build, etc.).
 
+## Publishing to npm
+
+Apps install the package from npm, so you must publish after changing the base:
+
+**Manual:** From this repo run `npm login` (once), then `npm publish`.
+
+**Via CI:** Push a version tag (e.g. `v1.0.12`) and add `NPM_TOKEN` (classic token with “Automation” or “Publish” scope) as a repo secret. The workflow will run `npm publish`.
+
+After publishing, bump the version in this repo, tag, push; in each app run `npm update icloud-windows-base` (or bump the version range in their package.json) to pick up changes.
+
 ## Local development
 
-From an app repo (e.g. `icloud-calendar-windows`) use a local path until the base is published:
+To test base changes without publishing, in an app use a local path:
 
 ```json
 "icloud-windows-base": "file:../icloud-windows-base"
 ```
 
-Run `npm install` in the app, then `npm start` / `npm run release` as usual.
-
-## Publishing the base
-
-1. Push this repo to GitHub (e.g. `taylorivanoff/icloud-windows-base`).
-2. **Option A — npm:** `npm publish` (public or scoped, e.g. `@taylorivanoff/icloud-windows-base`).
-3. **Option B — GitHub Packages:** Publish to npm with registry `https://npm.pkg.github.com` and use `"icloud-windows-base": "^1.0.0"` (or your scope).
-
-After publishing, replace `file:../icloud-windows-base` with the version range in each app and run `npm update icloud-windows-base` when you want to pull in wrapper changes.
+Run `npm install` in the app, then `npm start` / `npm run release`. Switch back to `"^1.0.12"` (or current version) before committing.
 
 ## Config for each app
 
