@@ -1,0 +1,13 @@
+{
+  "name": "icloud-windows-base",
+  "version": "1.0.11",
+  "description": "Shared Electron wrapper for iCloud Windows apps (tray, cookies, window, updater).",
+  "author": { "name": "Taylor Ivanoff" },
+  "repository": "https://github.com/taylorivanoff/icloud-windows-base",
+  "main": "index.js",
+  "peerDependencies": {
+    "electron": ">=28",
+    "electron-store": ">=8",
+    "electron-updater": ">=6"
+  }
+}
