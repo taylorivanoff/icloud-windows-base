@@ -21,7 +21,7 @@ require('icloud-windows-base').run({
 
 ```json
 "dependencies": {
-  "icloud-windows-base": "^1.0.12",
+  "icloud-windows-base": "^1.0.14",
   "electron-store": "^8.2.0",
   "electron-updater": "^6.1.8"
 }
@@ -35,7 +35,7 @@ Apps install the package from npm, so you must publish after changing the base:
 
 **Manual:** From this repo run `npm login` (once), then `npm publish`.
 
-**Via CI:** Push a version tag (e.g. `v1.0.12`) and add `NPM_TOKEN` (classic token with “Automation” or “Publish” scope) as a repo secret. The workflow will run `npm publish`.
+**Via CI:** Push a version tag (e.g. `v1.0.14`) and add `NPM_TOKEN` (classic token with “Automation” or “Publish” scope) as a repo secret. The workflow will run `npm publish`.
 
 After publishing, bump the version in this repo, tag, push; in each app run `npm update icloud-windows-base` (or bump the version range in their package.json) to pick up changes.
 
@@ -47,7 +47,7 @@ To test base changes without publishing, in an app use a local path:
 "icloud-windows-base": "file:../icloud-windows-base"
 ```
 
-Run `npm install` in the app, then `npm start` / `npm run release`. Switch back to `"^1.0.12"` (or current version) before committing.
+Run `npm install` in the app, then `npm start` / `npm run release`. Switch back to `"^1.0.14"` (or current version) before committing.
 
 ## Config for each app
 

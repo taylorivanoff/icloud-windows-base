@@ -1,8 +1,10 @@
-const { app, BrowserWindow, session, Tray, Menu, nativeImage, shell, screen } = require('electron');
+const { app, BrowserWindow, session, Tray, Menu, nativeImage, shell, screen, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const Store = require('electron-store');
 const path = require('path');
 const fs = require('fs');
+
+const START_MINIMIZED_ARG = '--start-minimized';
 
 /**
  * Run the iCloud Electron app with the given config.
@@ -22,6 +24,38 @@ function run(config) {
   function ensureDir(filePath) {
     const dir = path.dirname(filePath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  }
+
+  function getStartMinimised() {
+    return store.get('startMinimised', true);
+  }
+
+  function setStartMinimised(value) {
+    store.set('startMinimised', value);
+    syncLoginItemArgs();
+    if (tray) tray.setContextMenu(buildTrayMenu());
+  }
+
+  function shouldStartMinimised() {
+    return getStartMinimised();
+  }
+
+  function syncLoginItemArgs() {
+    const login = app.getLoginItemSettings();
+    if (!login.openAtLogin) return;
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      path: process.execPath,
+      args: getStartMinimised() ? [START_MINIMIZED_ARG] : []
+    });
+  }
+
+  function enableOpenAtLogin() {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      path: process.execPath,
+      args: getStartMinimised() ? [START_MINIMIZED_ARG] : []
+    });
   }
 
   async function loadSharedCookies(ses) {
@@ -69,8 +103,42 @@ function run(config) {
     }
   }
 
-  let mainWindow, splashWindow, tray, isQuitting = false;
+  let mainWindow, splashWindow, tray, isQuitting = false, startMinimised = true, manualUpdateCheck = false;
   const gotTheLock = app.requestSingleInstanceLock();
+
+  function showUpdateDialog(options) {
+    // Prefer a parentless dialog so it stays visible when the app is tray-only.
+    return dialog.showMessageBox({ noLink: true, ...options });
+  }
+
+  async function checkForUpdates(manual = false) {
+    if (!app.isPackaged) {
+      if (manual) {
+        await showUpdateDialog({
+          type: 'info',
+          title: appName,
+          message: 'Updates are only available in the installed app.',
+          buttons: ['OK']
+        });
+      }
+      return;
+    }
+    manualUpdateCheck = manual;
+    try {
+      await autoUpdater.checkForUpdates();
+    } catch (err) {
+      if (manual) {
+        await showUpdateDialog({
+          type: 'error',
+          title: appName,
+          message: 'Could not check for updates.',
+          detail: err?.message || String(err),
+          buttons: ['OK']
+        });
+      }
+      manualUpdateCheck = false;
+    }
+  }
 
   if (!gotTheLock) { app.quit(); return; }
 
@@ -119,13 +187,14 @@ function run(config) {
     mainWindow.loadURL(icloudUrl);
     mainWindow.webContents.on('did-finish-load', () => {
       if (splashWindow) { splashWindow.destroy(); splashWindow = null; }
-      // Start in tray only (don't show window); user clicks tray to open. Keeps startup-with-Windows minimized.
+      // Stay in tray when Start minimised is on (or launched at Windows login).
+      if (!startMinimised) mainWindow.show();
     });
     ses.cookies.on('changed', (event, cookie, cause, removed) => {
       if (cookie.domain?.includes('icloud.com') || cookie.domain?.includes('apple.com')) {
         saveSharedCookies(ses);
         if (!removed && cookie.name === 'X-APPLE-WEBAUTH-LOGIN')
-          app.setLoginItemSettings({ openAtLogin: true, path: process.execPath });
+          enableOpenAtLogin();
       }
     });
     mainWindow.on('resize', saveWindowBounds);
@@ -134,17 +203,28 @@ function run(config) {
     mainWindow.on('closed', () => { mainWindow = null; });
   }
 
+  function buildTrayMenu() {
+    return Menu.buildFromTemplate([
+      { label: `Show ${appName}`, click: () => { if (!mainWindow) createWindow(); mainWindow.show(); } },
+      { type: 'separator' },
+      {
+        label: 'Start minimised',
+        type: 'checkbox',
+        checked: getStartMinimised(),
+        click: (item) => setStartMinimised(item.checked)
+      },
+      { type: 'separator' },
+      { label: 'Check for Updates', click: () => checkForUpdates(true) },
+      { label: 'Quit', click: () => { isQuitting = true; app.quit(); } }
+    ]);
+  }
+
   function createTray() {
     if (tray) return;
     const icon = nativeImage.createFromPath(iconPath);
     tray = new Tray(icon);
     tray.setToolTip(appName);
-    tray.setContextMenu(Menu.buildFromTemplate([
-      { label: `Show ${appName}`, click: () => { if (!mainWindow) createWindow(); mainWindow.show(); } },
-      { type: 'separator' },
-      { label: 'Check for Updates', click: () => autoUpdater.checkForUpdatesAndNotify() },
-      { label: 'Quit', click: () => { isQuitting = true; app.quit(); } }
-    ]));
+    tray.setContextMenu(buildTrayMenu());
     tray.on('click', () => { if (!mainWindow) { createWindow(); return; } mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show(); });
   }
 
@@ -155,13 +235,69 @@ function run(config) {
   function setupAutoUpdater() {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
-    autoUpdater.checkForUpdatesAndNotify().catch(() => { });
+
+    autoUpdater.on('update-available', (info) => {
+      if (!manualUpdateCheck) return;
+      showUpdateDialog({
+        type: 'info',
+        title: appName,
+        message: `Update ${info.version} available.`,
+        detail: 'Downloading in the background. You will be prompted when it is ready to install.',
+        buttons: ['OK']
+      });
+    });
+
+    autoUpdater.on('update-not-available', (info) => {
+      if (!manualUpdateCheck) return;
+      manualUpdateCheck = false;
+      showUpdateDialog({
+        type: 'info',
+        title: appName,
+        message: 'You are up to date.',
+        detail: `Version ${info?.version || app.getVersion()} is the latest.`,
+        buttons: ['OK']
+      });
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      manualUpdateCheck = false;
+      showUpdateDialog({
+        type: 'info',
+        title: appName,
+        message: `Version ${info.version} is ready to install.`,
+        detail: 'Restart the app to apply the update.',
+        buttons: ['Restart now', 'Later'],
+        defaultId: 0,
+        cancelId: 1
+      }).then(({ response }) => {
+        if (response === 0) {
+          isQuitting = true;
+          autoUpdater.quitAndInstall(false, true);
+        }
+      });
+    });
+
+    autoUpdater.on('error', (err) => {
+      if (!manualUpdateCheck) return;
+      manualUpdateCheck = false;
+      showUpdateDialog({
+        type: 'error',
+        title: appName,
+        message: 'Could not check for updates.',
+        detail: err?.message || String(err),
+        buttons: ['OK']
+      });
+    });
+
+    checkForUpdates(false);
   }
 
   app.setAsDefaultProtocolClient(protocol);
 
   app.on('ready', () => {
-    createSplash();
+    startMinimised = shouldStartMinimised();
+    syncLoginItemArgs();
+    if (!startMinimised) createSplash();
     createWindow();
     createTray();
     setupJumpList();
