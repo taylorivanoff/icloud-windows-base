@@ -203,9 +203,16 @@ function run(config) {
     mainWindow.on('closed', () => { mainWindow = null; });
   }
 
+  async function refreshPage() {
+    if (!mainWindow) await createWindow();
+    if (!mainWindow) return;
+    mainWindow.webContents.reloadIgnoringCache();
+  }
+
   function buildTrayMenu() {
     return Menu.buildFromTemplate([
       { label: `Show ${appName}`, click: () => { if (!mainWindow) createWindow(); mainWindow.show(); } },
+      { label: 'Refresh', click: () => { refreshPage(); } },
       { type: 'separator' },
       {
         label: 'Start minimised',
