@@ -6,7 +6,7 @@
   "repository": "https://github.com/taylorivanoff/icloud-windows-base",
   "main": "index.js",
   "peerDependencies": {
-    "electron": ">=28",
+    "electron": ">=43",
     "electron-store": ">=8",
     "electron-updater": ">=6"
   }
