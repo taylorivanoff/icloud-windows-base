@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, Tray, Menu, nativeImage, shell, screen, dialog } = require('electron');
+const { app, BrowserWindow, session, Tray, Menu, nativeImage, shell, screen, dialog, powerMonitor } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const Store = require('electron-store');
 const path = require('path');
@@ -103,7 +103,7 @@ function run(config) {
     }
   }
 
-  let mainWindow, splashWindow, tray, isQuitting = false, startMinimised = true, manualUpdateCheck = false;
+  let mainWindow, splashWindow, tray, isQuitting = false, startMinimised = true, manualUpdateCheck = false, staleAfterSleep = false;
   const gotTheLock = app.requestSingleInstanceLock();
 
   function showUpdateDialog(options) {
@@ -199,6 +199,11 @@ function run(config) {
     });
     mainWindow.on('resize', saveWindowBounds);
     mainWindow.on('move', saveWindowBounds);
+    mainWindow.on('show', () => {
+      if (!staleAfterSleep) return;
+      staleAfterSleep = false;
+      refreshPage();
+    });
     mainWindow.on('close', (event) => { if (!isQuitting) { event.preventDefault(); mainWindow.hide(); } });
     mainWindow.on('closed', () => { mainWindow = null; });
   }
@@ -207,6 +212,16 @@ function run(config) {
     if (!mainWindow) await createWindow();
     if (!mainWindow) return;
     mainWindow.webContents.reloadIgnoringCache();
+  }
+
+  function setupSleepResumeRefresh() {
+    powerMonitor.on('resume', () => {
+      staleAfterSleep = true;
+      if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+        staleAfterSleep = false;
+        refreshPage();
+      }
+    });
   }
 
   function buildTrayMenu() {
@@ -309,6 +324,7 @@ function run(config) {
     createTray();
     setupJumpList();
     setupAutoUpdater();
+    setupSleepResumeRefresh();
   });
 
   app.on('open-url', (event, url) => {
