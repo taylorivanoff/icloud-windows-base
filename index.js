@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 
 const START_MINIMIZED_ARG = '--start-minimized';
+const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Run the iCloud Electron app with the given config.
@@ -294,7 +295,7 @@ function run(config) {
       }).then(({ response }) => {
         if (response === 0) {
           isQuitting = true;
-          autoUpdater.quitAndInstall(false, true);
+          autoUpdater.quitAndInstall(true, true);
         }
       });
     });
@@ -312,6 +313,7 @@ function run(config) {
     });
 
     checkForUpdates(false);
+    setInterval(() => checkForUpdates(false), UPDATE_CHECK_INTERVAL_MS);
   }
 
   app.setAsDefaultProtocolClient(protocol);
