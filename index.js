@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, Tray, Menu, nativeImage, shell, screen, powerMonitor } = require('electron');
+const { app, BrowserWindow, session, Tray, Menu, nativeImage, shell, screen, powerMonitor, Notification } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const Store = require('electron-store');
 const path = require('path');
@@ -214,8 +214,18 @@ function run(config) {
       },
       { type: 'separator' },
       { label: 'Check for Updates', click: () => checkForUpdates(true) },
+      { label: `Version ${app.getVersion()}`, enabled: false },
       { label: 'Quit', click: () => { isQuitting = true; app.quit(); } }
     ]);
+  }
+
+  function notifyUpdateFound(version) {
+    if (!Notification.isSupported()) return;
+    new Notification({
+      title: appName,
+      body: `Update ${version} found. The app will update and restart.`,
+      icon: iconPath
+    }).show();
   }
 
   function createTray() {
@@ -234,6 +244,10 @@ function run(config) {
   function setupAutoUpdater() {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
+
+    autoUpdater.on('update-available', (info) => {
+      notifyUpdateFound(info.version);
+    });
 
     autoUpdater.on('update-not-available', () => {
       manualUpdateCheck = false;
@@ -256,6 +270,10 @@ function run(config) {
   app.setAsDefaultProtocolClient(protocol);
 
   app.on('ready', () => {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'));
+      if (pkg.build?.appId) app.setAppUserModelId(pkg.build.appId);
+    } catch (_) { /* ignore */ }
     startMinimised = shouldStartMinimised();
     syncLoginItemArgs();
     if (!startMinimised) createSplash();
