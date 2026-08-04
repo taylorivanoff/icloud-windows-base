@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, Tray, Menu, nativeImage, shell, screen, dialog, powerMonitor } = require('electron');
+const { app, BrowserWindow, session, Tray, Menu, nativeImage, shell, screen, powerMonitor } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const Store = require('electron-store');
 const path = require('path');
@@ -106,11 +106,6 @@ function run(config) {
 
   let mainWindow, splashWindow, tray, isQuitting = false, startMinimised = true, manualUpdateCheck = false, staleAfterSleep = false;
   const gotTheLock = app.requestSingleInstanceLock();
-
-  function showUpdateDialog(options) {
-    // Prefer a parentless dialog so it stays visible when the app is tray-only.
-    return dialog.showMessageBox({ noLink: true, ...options });
-  }
 
   async function checkForUpdates(manual = false) {
     if (!app.isPackaged) return;
@@ -244,28 +239,10 @@ function run(config) {
       manualUpdateCheck = false;
     });
 
-    autoUpdater.on('update-downloaded', (info) => {
-      const installNow = manualUpdateCheck;
+    autoUpdater.on('update-downloaded', () => {
       manualUpdateCheck = false;
-      if (installNow) {
-        isQuitting = true;
-        autoUpdater.quitAndInstall(true, true);
-        return;
-      }
-      showUpdateDialog({
-        type: 'info',
-        title: appName,
-        message: `Version ${info.version} is ready to install.`,
-        detail: 'Restart the app to apply the update.',
-        buttons: ['Restart now', 'Later'],
-        defaultId: 0,
-        cancelId: 1
-      }).then(({ response }) => {
-        if (response === 0) {
-          isQuitting = true;
-          autoUpdater.quitAndInstall(true, true);
-        }
-      });
+      isQuitting = true;
+      autoUpdater.quitAndInstall(true, true);
     });
 
     autoUpdater.on('error', () => {
