@@ -1,6 +1,12 @@
-# icloud-windows-base
+# icloud-windows-base — Shared Electron Wrapper for iCloud Windows Apps
 
-Shared Electron wrapper for all iCloud Windows apps. Single place for tray, shared cookies, window bounds, splash, and auto-updater. Each app (Calendar, Contacts, Mail, etc.) depends on this package and only provides a small config.
+Shared **Electron base package** for unofficial **iCloud and Apple web apps on Windows**. One library for system tray, shared cookies / Apple ID session, window bounds persistence, splash screen, and auto-updater. Each app (Calendar, Contacts, Mail, Photos, Music, and more) depends on this package and only provides a small config.
+
+Published on npm as [`icloud-windows-base`](https://www.npmjs.com/package/icloud-windows-base).
+
+## What it powers
+
+Desktop Windows clients for iCloud Calendar, Contacts, Drive, Find My, Keynote, Mail, Notes, Numbers, Pages, Photos, Reminders, plus Apple Music, Podcasts, TV, and Invites — without rewriting tray and session logic per app.
 
 ## Usage (in each app)
 
@@ -64,3 +70,11 @@ Run `npm install` in the app, then `npm start` / `npm run release`. Switch back 
 | Pages | iCloud Pages | icloud-pages | https://www.icloud.com/pages |
 | Photos | iCloud Photos | icloud-photos | https://www.icloud.com/photos |
 | Reminders | iCloud Reminders | icloud-reminders | https://www.icloud.com/reminders |
+
+## Keywords
+
+iCloud Windows Electron base, shared Electron tray wrapper, Apple ID session cookies, iCloud desktop app framework, electron-updater Windows template
+
+## License
+
+See repository license file if present.
