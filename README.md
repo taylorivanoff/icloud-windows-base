@@ -1,16 +1,16 @@
-# icloud-windows-base — Shared Electron Wrapper for iCloud Windows Apps
+# icloud-windows-base - Shared Electron Wrapper for iCloud Windows Apps
 
-Shared **Electron base package** for unofficial **iCloud and Apple web apps on Windows**. One library for system tray, shared cookies / Apple ID session, window bounds persistence, splash screen, and auto-updater. Each app (Calendar, Contacts, Mail, Photos, Music, and more) depends on this package and only provides a small config.
+Shared **Electron base package** for **iCloud and Apple web apps on Windows**. One library for system tray, shared cookies / Apple ID session, window bounds persistence, splash screen, and auto-updater. Each app (Calendar, Contacts, Mail, Photos, Music, and more) depends on this package and only provides a small config.
 
 Published on npm as [`icloud-windows-base`](https://www.npmjs.com/package/icloud-windows-base).
 
 ## What it powers
 
-Desktop Windows clients for iCloud Calendar, Contacts, Drive, Find My, Keynote, Mail, Notes, Numbers, Pages, Photos, Reminders, plus Apple Music, Podcasts, TV, and Invites — without rewriting tray and session logic per app.
+Desktop Windows clients for iCloud Calendar, Contacts, Drive, Find My, Keynote, Mail, Notes, Numbers, Pages, Photos, Reminders, plus Apple Music, Podcasts, TV, and Invites - without rewriting tray and session logic per app.
 
 ## Usage (in each app)
 
-**main.js** — thin entry point:
+**main.js** - thin entry point:
 
 ```js
 const path = require('path');
@@ -23,7 +23,7 @@ require('icloud-windows-base').run({
 });
 ```
 
-**package.json** — add dependency:
+**package.json** - add dependency:
 
 ```json
 "dependencies": {
@@ -41,7 +41,7 @@ Apps install the package from npm, so you must publish after changing the base:
 
 **Manual:** From this repo run `npm login` (once), then `npm publish`.
 
-**Via CI:** Push a version tag (e.g. `v1.0.14`) and add `NPM_TOKEN` (classic token with “Automation” or “Publish” scope) as a repo secret. The workflow will run `npm publish`.
+**Via CI:** Push a version tag (e.g. `v1.0.14`) and add `NPM_TOKEN` (classic token with "Automation" or "Publish" scope) as a repo secret. The workflow will run `npm publish`.
 
 After publishing, bump the version in this repo, tag, push; in each app run `npm update icloud-windows-base` (or bump the version range in their package.json) to pick up changes.
 
