@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, Tray, Menu, nativeImage, shell, screen, powerMonitor, Notification } = require('electron');
+const { app, BrowserWindow, BrowserView, session, Tray, Menu, nativeImage, shell, screen, powerMonitor, Notification, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const Store = require('electron-store');
 const path = require('path');
@@ -6,6 +6,93 @@ const fs = require('fs');
 
 const START_MINIMIZED_ARG = '--start-minimized';
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+async function removeIcloudToolbar(webContents) {
+  if (!webContents || webContents.isDestroyed()) return;
+  try {
+    await webContents.executeJavaScript(`(() => {
+      const TOOLBAR_H = 44;
+      const SELECTORS = [
+        '.cloudos-toolbar-view',
+        'header.cloudos-toolbar.app',
+        'header.cloudos-toolbar'
+      ];
+
+      function nearToolbarOffset(value) {
+        const n = parseFloat(value);
+        return Number.isFinite(n) && n >= TOOLBAR_H - 6 && n <= TOOLBAR_H + 6;
+      }
+
+      function fixLayout(root = document) {
+        const win = root.defaultView || window;
+        const vh = win.innerHeight;
+        if (!vh) return;
+
+        const docEl = root.documentElement;
+        if (docEl?.style) {
+          docEl.style.setProperty('--cw-toolbar-height', '0px');
+          docEl.style.setProperty('--toolbar-height', '0px');
+        }
+
+        for (const el of root.querySelectorAll?.('*') || []) {
+          const style = window.getComputedStyle(el);
+          const rect = el.getBoundingClientRect();
+
+          if (nearToolbarOffset(style.top)) el.style.top = '0';
+          if (nearToolbarOffset(style.marginTop)) el.style.marginTop = '0';
+          if (nearToolbarOffset(style.paddingTop)) el.style.paddingTop = '0';
+          if (nearToolbarOffset(style.paddingBottom)) el.style.paddingBottom = '0';
+
+          const h = parseFloat(style.height);
+          if (Number.isFinite(h) && Math.abs(h - (vh - TOOLBAR_H)) <= 10) {
+            el.style.height = vh + 'px';
+          }
+
+          // Full-width shell still sized for viewport minus toolbar.
+          if (
+            rect.width >= win.innerWidth * 0.85 &&
+            rect.height >= vh - TOOLBAR_H - 20 &&
+            rect.height <= vh - TOOLBAR_H + 10 &&
+            rect.top <= 10
+          ) {
+            el.style.height = vh + 'px';
+            el.style.minHeight = vh + 'px';
+          }
+        }
+      }
+
+      function removeToolbar(root = document) {
+        for (const selector of SELECTORS) {
+          root.querySelectorAll?.(selector)?.forEach((el) => el.remove());
+        }
+        fixLayout(root);
+        for (const frame of root.querySelectorAll?.('iframe') || []) {
+          try {
+            const doc = frame.contentDocument;
+            if (doc) removeToolbar(doc);
+          } catch (_) { /* cross-origin */ }
+        }
+      }
+
+      removeToolbar();
+      if (!window.__icloudBaseToolbarObserver) {
+        let scheduled = false;
+        window.__icloudBaseToolbarObserver = new MutationObserver(() => {
+          if (scheduled) return;
+          scheduled = true;
+          requestAnimationFrame(() => {
+            scheduled = false;
+            removeToolbar();
+          });
+        });
+        window.__icloudBaseToolbarObserver.observe(document.documentElement, {
+          childList: true,
+          subtree: true
+        });
+      }
+    })();`);
+  } catch (_) { /* ignore */ }
+}
 
 /**
  * Run the iCloud Electron app with the given config.
@@ -162,10 +249,20 @@ function run(config) {
       return { action: 'deny' };
     });
     mainWindow.loadURL(icloudUrl);
+    mainWindow.webContents.on('dom-ready', () => {
+      removeIcloudToolbar(mainWindow.webContents);
+    });
     mainWindow.webContents.on('did-finish-load', () => {
+      removeIcloudToolbar(mainWindow.webContents);
       if (splashWindow) { splashWindow.destroy(); splashWindow = null; }
       // Stay in tray when Start minimised is on (or launched at Windows login).
       if (!startMinimised) mainWindow.show();
+    });
+    mainWindow.webContents.on('did-navigate-in-page', () => {
+      removeIcloudToolbar(mainWindow.webContents);
+    });
+    mainWindow.webContents.on('did-frame-finish-load', (_e, isMainFrame) => {
+      if (!isMainFrame) removeIcloudToolbar(mainWindow.webContents);
     });
     ses.cookies.on('changed', (event, cookie, cause, removed) => {
       if (cookie.domain?.includes('icloud.com') || cookie.domain?.includes('apple.com')) {

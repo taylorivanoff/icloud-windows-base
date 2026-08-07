@@ -1,12 +1,12 @@
-# icloud-windows-base - Shared Electron Wrapper for iCloud Windows Apps
+# icloud-windows-base - Shared Electron Wrapper for Windows Web Apps
 
-Shared **Electron base package** for **iCloud and Apple web apps on Windows**. One library for system tray, shared cookies / Apple ID session, window bounds persistence, splash screen, and auto-updater. Each app (Calendar, Contacts, Mail, Photos, Music, and more) depends on this package and only provides a small config.
+Shared **Electron base package** for **web apps on Windows**. One library for system tray, persistent sessions, window bounds persistence, splash screen, and auto-updater. Single-service wrappers and the Premium Web App Launcher use this package.
 
 Published on npm as [`icloud-windows-base`](https://www.npmjs.com/package/icloud-windows-base).
 
 ## What it powers
 
-Desktop Windows clients for iCloud Calendar, Contacts, Drive, Find My, Keynote, Mail, Notes, Numbers, Pages, Photos, Reminders, plus Apple Music, Podcasts, TV, and Invites - without rewriting tray and session logic per app.
+The original single-service wrappers support iCloud Calendar, Contacts, Drive, Find My, Keynote, Mail, Notes, Numbers, Pages, Photos, Reminders, plus Apple Music, Podcasts, TV, and Invites. The launcher API also supports configurable HTTPS web apps without making iCloud the product identity.
 
 ## Usage (in each app)
 
@@ -70,6 +70,23 @@ Run `npm install` in the app, then `npm start` / `npm run release`. Switch back 
 | Pages | iCloud Pages | icloud-pages | https://www.icloud.com/pages |
 | Photos | iCloud Photos | icloud-photos | https://www.icloud.com/photos |
 | Reminders | iCloud Reminders | icloud-reminders | https://www.icloud.com/reminders |
+
+## Launcher API
+
+Use `runLauncher` for a product that owns a catalog of web apps:
+
+```js
+require('icloud-windows-base').runLauncher({
+  appName: 'Premium Web App Launcher',
+  protocol: 'web-app-launcher',
+  entries: [{ id: 'notes', name: 'Notes', url: 'https://example.com' }],
+  launcherPath: path.join(__dirname, 'launcher.html'),
+  preloadPath: path.join(__dirname, 'preload.js'),
+  iconPath: path.join(__dirname, 'icon.png')
+});
+```
+
+The launcher opens HTTPS entries as vertical, tab-like views inside the launcher window, persists a shared browser session, and provides tray/startup behavior. It does not store service credentials.
 
 ## Keywords
 
