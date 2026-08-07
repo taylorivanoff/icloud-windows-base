@@ -35,6 +35,21 @@ require('icloud-windows-base').run({
 
 Keep in each app: `splash.html`, `icon.png`, `installer.nsh`, and app-specific `package.json` (appId, productName, build, etc.).
 
+## Package layout
+
+| Module | Responsibility |
+|--------|----------------|
+| `main/index.js` | App lifecycle orchestration (`run()`) |
+| `main/window.js` | BrowserWindow, navigation guard, sleep refresh |
+| `main/toolbar.js` | Remove iCloud in-page toolbar (DOM + MutationObserver) |
+| `main/cookies.js` | Shared Apple session cookies across apps |
+| `main/store.js` | Window bounds and tray preferences |
+| `main/login.js` | Windows startup login item |
+| `main/tray.js` | System tray menu |
+| `main/updater.js` | GitHub release auto-updates |
+
+Root `index.js` re-exports `./main` for backward compatibility.
+
 ## Publishing to npm
 
 Apps install the package from npm, so you must publish after changing the base:
@@ -87,6 +102,33 @@ require('icloud-windows-base').runLauncher({
 ```
 
 The launcher opens HTTPS entries as vertical, tab-like views inside the launcher window, persists a shared browser session, and provides tray/startup behavior. It does not store service credentials.
+
+## Security & authentication
+
+Apps built on this package load **official Apple web UIs** in an Electron `BrowserWindow`. There is no custom login API and no password storage.
+
+### User-facing summary
+
+Each app README includes a [Security & authentication](docs/security-auth-snippet.md) section for end users. In short:
+
+- Sign-in happens on Apple-controlled pages (`icloud.com`, `apple.com`, etc.).
+- Session cookies for `icloud.com` and `apple.com` are persisted in partition `persist:icloud` and mirrored to `%APPDATA%\icloud-shared\cookies.json` so all apps in this family share one sign-in on the same Windows user account.
+- `electron-store` holds only UI preferences (window bounds, tray options)—never Apple ID credentials.
+- `nodeIntegration: false` in the web view; external links open via `shell.openExternal`.
+
+### Implementation (for reviewers)
+
+| Mechanism | Location in `index.js` |
+|-----------|------------------------|
+| Load shared cookies on startup | `loadSharedCookies()` → `persist:icloud` |
+| Save cookies on change / quit | `saveSharedCookies()`, `ses.cookies.on('changed')`, `before-quit` |
+| Shared cookie file | `%APPDATA%\icloud-shared\cookies.json` |
+| Domains synced | `icloud.com`, `apple.com` only |
+| Start at Windows login | Enabled after `X-APPLE-WEBAUTH-LOGIN` cookie is set |
+
+Cookies are written to disk as JSON and are only as protected as the Windows user profile. Apps do not transmit session data to the package author or third parties—requests go to Apple the same way they would from a browser using those cookies.
+
+To sign out on a machine, users should use Apple's web **Sign Out** or delete the shared cookie file and quit all related apps.
 
 ## Keywords
 
