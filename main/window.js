@@ -82,7 +82,7 @@ async function createWindow({
   icloudUrl,
   startMinimised,
   isQuittingRef,
-  removeToolbar = true
+  removeToolbar = false
 }) {
   if (mainWindow) return;
   const bounds = getWindowBounds(store);

@@ -33,7 +33,7 @@ const { setupAutoUpdater } = require('./updater');
  * }} config
  */
 function run(config) {
-  const { appName, protocol, icloudUrl, splashPath, iconPath, removeToolbar = true } = config;
+  const { appName, protocol, icloudUrl, splashPath, iconPath, removeToolbar = false } = config;
   const store = createStore();
   const isQuittingRef = { current: false };
   let startMinimised = true;
