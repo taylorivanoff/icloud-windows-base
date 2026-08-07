@@ -50,16 +50,6 @@ Keep in each app: `splash.html`, `icon.png`, `installer.nsh`, and app-specific `
 
 Root `index.js` re-exports `./main` for backward compatibility.
 
-## Publishing to npm
-
-Apps install the package from npm, so you must publish after changing the base:
-
-**Manual:** From this repo run `npm login` (once), then `npm publish`.
-
-**Via CI:** Push a version tag (e.g. `v1.0.14`) and add `NPM_TOKEN` (classic token with "Automation" or "Publish" scope) as a repo secret. The workflow will run `npm publish`.
-
-After publishing, bump the version in this repo, tag, push; in each app run `npm update icloud-windows-base` (or bump the version range in their package.json) to pick up changes.
-
 ## Local development
 
 To test base changes without publishing, in an app use a local path:
@@ -85,23 +75,6 @@ Run `npm install` in the app, then `npm start` / `npm run release`. Switch back 
 | Pages | iCloud Pages | icloud-pages | https://www.icloud.com/pages |
 | Photos | iCloud Photos | icloud-photos | https://www.icloud.com/photos |
 | Reminders | iCloud Reminders | icloud-reminders | https://www.icloud.com/reminders |
-
-## Launcher API
-
-Use `runLauncher` for a product that owns a catalog of web apps:
-
-```js
-require('icloud-windows-base').runLauncher({
-  appName: 'Premium Web App Launcher',
-  protocol: 'web-app-launcher',
-  entries: [{ id: 'notes', name: 'Notes', url: 'https://example.com' }],
-  launcherPath: path.join(__dirname, 'launcher.html'),
-  preloadPath: path.join(__dirname, 'preload.js'),
-  iconPath: path.join(__dirname, 'icon.png')
-});
-```
-
-The launcher opens HTTPS entries as vertical, tab-like views inside the launcher window, persists a shared browser session, and provides tray/startup behavior. It does not store service credentials.
 
 ## Security & authentication
 
