@@ -29,14 +29,19 @@ const { setupAutoUpdater } = require('./updater');
  *   icloudUrl: string;
  *   splashPath: string;
  *   iconPath: string;
+ *   removeToolbar?: boolean;
  * }} config
  */
 function run(config) {
-  const { appName, protocol, icloudUrl, splashPath, iconPath } = config;
+  const { appName, protocol, icloudUrl, splashPath, iconPath, removeToolbar = true } = config;
   const store = createStore();
   const isQuittingRef = { current: false };
   let startMinimised = true;
   let checkForUpdates = () => {};
+
+  function windowOpts() {
+    return { store, icloudUrl, startMinimised, isQuittingRef, removeToolbar };
+  }
 
   function readStartMinimised() {
     return getStartMinimised(store);
@@ -56,7 +61,7 @@ function run(config) {
       onShow: () => {
         const win = getMainWindow();
         if (!win) {
-          createWindow({ store, icloudUrl, startMinimised, isQuittingRef });
+          createWindow(windowOpts());
           return;
         }
         win.show();
@@ -104,7 +109,7 @@ function run(config) {
     syncLoginItemArgs(readStartMinimised);
 
     if (!startMinimised) createSplash(splashPath);
-    createWindow({ store, icloudUrl, startMinimised, isQuittingRef });
+    createWindow(windowOpts());
 
     createTray({
       appName,
@@ -115,7 +120,7 @@ function run(config) {
     setTrayClickHandler(() => {
       const win = getMainWindow();
       if (!win) {
-        createWindow({ store, icloudUrl, startMinimised, isQuittingRef });
+        createWindow(windowOpts());
         return;
       }
       win.isVisible() ? win.hide() : win.show();

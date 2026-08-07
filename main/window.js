@@ -81,7 +81,8 @@ async function createWindow({
   store,
   icloudUrl,
   startMinimised,
-  isQuittingRef
+  isQuittingRef,
+  removeToolbar = true
 }) {
   if (mainWindow) return;
   const bounds = getWindowBounds(store);
@@ -108,7 +109,7 @@ async function createWindow({
   });
 
   attachNavigationGuard(mainWindow.webContents, appTarget);
-  attachToolbarRemoval(mainWindow.webContents);
+  if (removeToolbar) attachToolbarRemoval(mainWindow.webContents);
 
   mainWindow.loadURL(icloudUrl);
 
