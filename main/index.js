@@ -2,7 +2,7 @@ const { app, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { createStore, getStartMinimised, setStartMinimised } = require('./store');
-const { saveSharedCookies, stopWatchingSharedCookies } = require('./cookies');
+const { saveSharedCookies } = require('./cookies');
 const { syncLoginItemArgs } = require('./login');
 const {
   createSplash,
@@ -147,22 +147,11 @@ function run(config) {
     if (!isQuittingRef.current) event.preventDefault();
   });
 
-  let flushOnQuitStarted = false;
-  app.on('before-quit', (event) => {
+  app.on('before-quit', async () => {
     isQuittingRef.current = true;
-    if (flushOnQuitStarted) return;
-    flushOnQuitStarted = true;
-    // Electron does not await async before-quit handlers; block quit until cookies flush.
-    event.preventDefault();
     const ses = session.fromPartition('persist:icloud');
-    Promise.resolve()
-      .then(() => saveSharedCookies(ses))
-      .then(() => ses.cookies.flushStore())
-      .catch(() => {})
-      .finally(() => {
-        stopWatchingSharedCookies();
-        app.exit(0);
-      });
+    await saveSharedCookies(ses);
+    await ses.cookies.flushStore();
   });
 }
 

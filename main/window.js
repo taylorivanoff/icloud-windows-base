@@ -1,12 +1,6 @@
 const { BrowserWindow, shell, powerMonitor } = require('electron');
 const { SAFARI_UA } = require('./constants');
-const {
-  loadSharedCookies,
-  scheduleSaveSharedCookies,
-  watchSharedCookies,
-  isApplyingSharedCookies,
-  isAppleFamilyDomain
-} = require('./cookies');
+const { loadSharedCookies, saveSharedCookies } = require('./cookies');
 const { getWindowBounds, saveWindowBounds } = require('./store');
 const { enableOpenAtLogin } = require('./login');
 const { removeIcloudToolbar } = require('./toolbar');
@@ -103,14 +97,6 @@ async function createWindow({
   const ses = mainWindow.webContents.session;
   await loadSharedCookies(ses);
 
-  watchSharedCookies(ses, {
-    onExternalUpdate: () => {
-      if (!mainWindow || mainWindow.isDestroyed()) return;
-      // Pick up a login (or sign-out) performed in another app.
-      mainWindow.webContents.reloadIgnoringCache();
-    }
-  });
-
   ses.webRequest.onBeforeSendHeaders((details, callback) => {
     details.requestHeaders['User-Agent'] = SAFARI_UA;
     callback({ cancel: false, requestHeaders: details.requestHeaders });
@@ -136,11 +122,11 @@ async function createWindow({
   });
 
   ses.cookies.on('changed', (_event, cookie, _cause, removed) => {
-    if (isApplyingSharedCookies()) return;
-    if (!isAppleFamilyDomain(cookie?.domain)) return;
-    scheduleSaveSharedCookies(ses);
-    if (!removed && cookie.name === 'X-APPLE-WEBAUTH-LOGIN') {
-      enableOpenAtLogin(() => store.get('startMinimised', true));
+    if (cookie.domain?.includes('icloud.com') || cookie.domain?.includes('apple.com')) {
+      saveSharedCookies(ses);
+      if (!removed && cookie.name === 'X-APPLE-WEBAUTH-LOGIN') {
+        enableOpenAtLogin(() => store.get('startMinimised', true));
+      }
     }
   });
 
