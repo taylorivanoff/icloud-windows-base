@@ -86,6 +86,7 @@ Each app README includes a [Security & authentication](docs/security-auth-snippe
 
 - Sign-in happens on Apple-controlled pages (`icloud.com`, `apple.com`, etc.).
 - Session cookies for `icloud.com` and `apple.com` are persisted in partition `persist:icloud` and mirrored to `%APPDATA%\icloud-shared\cookies.json` so all apps in this family share one sign-in on the same Windows user account.
+- Apple often issues auth cookies **without an expiry** (browser session cookies). The base assigns a durable expiry when saving so they survive app quit and PC restart, and watches the shared file so a login in one app propagates to others that are already open.
 - `electron-store` holds only UI preferences (window bounds, tray options)—never Apple ID credentials.
 - `nodeIntegration: false` in the web view; external links open via `shell.openExternal`.
 
@@ -94,9 +95,10 @@ Each app README includes a [Security & authentication](docs/security-auth-snippe
 | Mechanism | Location in `index.js` |
 |-----------|------------------------|
 | Load shared cookies on startup | `loadSharedCookies()` → `persist:icloud` |
-| Save cookies on change / quit | `saveSharedCookies()`, `ses.cookies.on('changed')`, `before-quit` |
+| Save cookies on change / quit | `scheduleSaveSharedCookies()`, `ses.cookies.on('changed')`, blocking `before-quit` flush |
+| Live sync across apps | `watchSharedCookies()` reloads `%APPDATA%\icloud-shared\cookies.json` |
 | Shared cookie file | `%APPDATA%\icloud-shared\cookies.json` |
-| Domains synced | `icloud.com`, `apple.com` only |
+| Domains synced | `icloud.com`, `apple.com` (and subdomains) |
 | Start at Windows login | Enabled after `X-APPLE-WEBAUTH-LOGIN` cookie is set |
 
 Cookies are written to disk as JSON and are only as protected as the Windows user profile. Apps do not transmit session data to the package author or third parties—requests go to Apple the same way they would from a browser using those cookies.
