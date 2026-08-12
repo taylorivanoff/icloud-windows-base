@@ -17,8 +17,49 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - id: check
+        run: |
+          set -e
+          # Only source and package files should bump version or cut a release.
+          # Docs, README, CI config, licenses, etc. are ignored.
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            CHANGED=$(git diff --name-only HEAD^ HEAD)
+          else
+            CHANGED=$(git show --pretty="" --name-only HEAD)
+          fi
+
+          is_release_relevant() {
+            case "$1" in
+              package.json|package-lock.json|bun.lock|bun.lockb|yarn.lock|pnpm-lock.yaml)
+                return 0
+                ;;
+              *.js|*.mjs|*.cjs|*.ts|*.tsx)
+                return 0
+                ;;
+            esac
+            return 1
+          }
+
+          SHOULD_RELEASE=false
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            if is_release_relevant "$file"; then
+              SHOULD_RELEASE=true
+              break
+            fi
+          done <<< "$CHANGED"
+
+          if [ "$SHOULD_RELEASE" = true ]; then
+            echo "Release-relevant files changed"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Only docs/metadata changed; skipping version bump and release"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Bump version if unchanged
         id: version
+        if: steps.check.outputs.should_release == 'true'
         run: |
           set -e
           CURRENT=$(jq -r .version package.json)
@@ -48,6 +89,7 @@ jobs:
 
       - name: Generate changelog
         id: changelog
+        if: steps.check.outputs.should_release == 'true'
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -z "$LAST_TAG" ]; then
@@ -60,6 +102,7 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Create tag and release
+        if: steps.check.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
