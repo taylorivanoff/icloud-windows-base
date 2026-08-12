@@ -98,6 +98,7 @@ Each app README includes a [Security & authentication](docs/security-auth-snippe
 | Shared cookie file | `%APPDATA%\icloud-shared\cookies.json` |
 | Domains synced | `icloud.com`, `apple.com` only |
 | Start at Windows login | Enabled after `X-APPLE-WEBAUTH-LOGIN` cookie is set |
+| Start minimised | Tray toggle sets login-item `--start-minimized`; manual launches always show the window |
 
 Cookies are written to disk as JSON and are only as protected as the Windows user profile. Apps do not transmit session data to the package author or third parties—requests go to Apple the same way they would from a browser using those cookies.
 

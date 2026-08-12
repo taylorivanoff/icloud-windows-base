@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { createStore, getStartMinimised, setStartMinimised } = require('./store');
 const { saveSharedCookies } = require('./cookies');
-const { syncLoginItemArgs } = require('./login');
+const { syncLoginItemArgs, wasLaunchedMinimised, hasStartMinimizedArg } = require('./login');
 const {
   createSplash,
   createWindow,
@@ -36,11 +36,10 @@ function run(config) {
   const { appName, protocol, icloudUrl, splashPath, iconPath, removeToolbar = false } = config;
   const store = createStore();
   const isQuittingRef = { current: false };
-  let startMinimised = true;
   let checkForUpdates = () => {};
 
   function windowOpts() {
-    return { store, icloudUrl, startMinimised, isQuittingRef, removeToolbar };
+    return { store, icloudUrl, isQuittingRef, removeToolbar };
   }
 
   function readStartMinimised() {
@@ -51,6 +50,11 @@ function run(config) {
     setStartMinimised(store, value);
     syncLoginItemArgs(readStartMinimised);
     updateTrayMenu(buildTrayMenuInstance());
+    // Unchecking while hidden should feel immediate, not only after next boot.
+    if (!value) {
+      const win = getMainWindow();
+      if (win && !win.isDestroyed() && !win.isVisible()) win.show();
+    }
   }
 
   function buildTrayMenuInstance() {
@@ -82,6 +86,8 @@ function run(config) {
   }
 
   app.on('second-instance', (_event, argv) => {
+    // Duplicate login launches pass --start-minimized; keep the existing tray instance hidden.
+    if (hasStartMinimizedArg(argv)) return;
     const win = getMainWindow();
     if (win) {
       if (win.isMinimized()) win.restore();
@@ -105,10 +111,9 @@ function run(config) {
       if (pkg.build?.appId) app.setAppUserModelId(pkg.build.appId);
     } catch (_) { /* ignore */ }
 
-    startMinimised = readStartMinimised();
     syncLoginItemArgs(readStartMinimised);
 
-    if (!startMinimised) createSplash(splashPath);
+    if (!wasLaunchedMinimised()) createSplash(splashPath);
     createWindow(windowOpts());
 
     createTray({

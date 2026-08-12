@@ -1,6 +1,17 @@
 const { app } = require('electron');
 const { START_MINIMIZED_ARG } = require('./constants');
 
+function hasStartMinimizedArg(argv = process.argv) {
+  return argv.some(
+    (arg) => arg === START_MINIMIZED_ARG || arg.startsWith(`${START_MINIMIZED_ARG}=`)
+  );
+}
+
+/** True when this process was launched with the login-item minimised flag. */
+function wasLaunchedMinimised(argv = process.argv) {
+  return hasStartMinimizedArg(argv);
+}
+
 function syncLoginItemArgs(getStartMinimised) {
   const login = app.getLoginItemSettings();
   if (!login.openAtLogin) return;
@@ -19,4 +30,9 @@ function enableOpenAtLogin(getStartMinimised) {
   });
 }
 
-module.exports = { syncLoginItemArgs, enableOpenAtLogin };
+module.exports = {
+  hasStartMinimizedArg,
+  wasLaunchedMinimised,
+  syncLoginItemArgs,
+  enableOpenAtLogin
+};

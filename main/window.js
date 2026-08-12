@@ -2,7 +2,7 @@ const { BrowserWindow, shell, powerMonitor } = require('electron');
 const { SAFARI_UA } = require('./constants');
 const { loadSharedCookies, saveSharedCookies } = require('./cookies');
 const { getWindowBounds, saveWindowBounds } = require('./store');
-const { enableOpenAtLogin } = require('./login');
+const { enableOpenAtLogin, wasLaunchedMinimised } = require('./login');
 const { removeIcloudToolbar } = require('./toolbar');
 
 let mainWindow = null;
@@ -80,10 +80,10 @@ function showMainWindow() {
 async function createWindow({
   store,
   icloudUrl,
-  startMinimised,
   isQuittingRef,
   removeToolbar = false
 }) {
+  const launchedMinimised = wasLaunchedMinimised();
   if (mainWindow) return;
   const bounds = getWindowBounds(store);
   const appTarget = parseAppTarget(icloudUrl);
@@ -118,7 +118,7 @@ async function createWindow({
       splashWindow.destroy();
       splashWindow = null;
     }
-    if (!startMinimised) mainWindow.show();
+    if (!launchedMinimised) mainWindow.show();
   });
 
   ses.cookies.on('changed', (_event, cookie, _cause, removed) => {
