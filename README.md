@@ -27,9 +27,9 @@ require('icloud-windows-base').run({
 
 ```json
 "dependencies": {
-  "icloud-windows-base": "^1.0.14",
+  "icloud-windows-base": "^1.0.28",
   "electron-store": "^8.2.0",
-  "electron-updater": "^6.1.8"
+  "electron-updater": "^6.8.9"
 }
 ```
 
@@ -39,14 +39,13 @@ Keep in each app: `splash.html`, `icon.png`, `installer.nsh`, and app-specific `
 
 | Module | Responsibility |
 |--------|----------------|
-| `main/index.js` | App lifecycle orchestration (`run()`) |
-| `main/window.js` | BrowserWindow, navigation guard, sleep refresh |
-| `main/toolbar.js` | Remove iCloud in-page toolbar (DOM + MutationObserver) |
+| `main/index.js` | App lifecycle via `electron-tray-base` |
+| `main/icloud-webview.js` | Safari UA, navigation guard, toolbar removal, cookie hooks |
 | `main/cookies.js` | Per-app Apple session cookie persistence |
-| `main/store.js` | Window bounds and tray preferences |
-| `main/login.js` | Windows startup login item |
-| `main/tray.js` | System tray menu |
-| `main/updater.js` | GitHub release auto-updates |
+| `main/toolbar.js` | Remove iCloud in-page toolbar (DOM + MutationObserver) |
+| `main/constants.js` | Safari User-Agent string |
+
+Tray, window bounds, splash, login item, updater, and single-instance handling come from [`electron-tray-base`](https://github.com/taylorivanoff/electron-tray-base).
 
 Root `index.js` re-exports `./main` for backward compatibility.
 

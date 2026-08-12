@@ -1,24 +1,51 @@
 const { app, session, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { createStore, getStartMinimised, setStartMinimised } = require('./store');
+const Store = require('electron-store');
+const { applyCommonSettings, readCommonSettings, getMainWindow } = require('electron-tray-base');
 const { savePersistedCookies, stopCookiePersistence } = require('./cookies');
-const { syncLoginItemArgs } = require('./login');
-const {
-  createSplash,
-  createWindow,
-  refreshPage,
-  setupSleepResumeRefresh,
-  getMainWindow,
-  showMainWindow
-} = require('./window');
-const {
-  buildTrayMenu,
-  createTray,
-  updateTrayMenu,
-  setTrayClickHandler
-} = require('./tray');
-const { setupAutoUpdater } = require('./updater');
+const { setupIcloudWebview } = require('./icloud-webview');
+
+function loadElectronTrayBase() {
+  if (!app.isPackaged) {
+    const localBase = path.join(__dirname, '..', '..', '..', 'electron-tray-base');
+    try {
+      const resolved = require.resolve(localBase);
+      delete require.cache[resolved];
+      return require(localBase);
+    } catch (_) {
+      // Fall through to installed package.
+    }
+  }
+  return require('electron-tray-base');
+}
+
+const trayBase = loadElectronTrayBase();
+
+function createIcloudStore() {
+  return new Store({
+    defaults: {
+      startMinimised: true,
+      alwaysOnTop: false,
+      opacity: 1,
+      windowBounds: null
+    }
+  });
+}
+
+function readAppId() {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'));
+    return pkg.build?.appId;
+  } catch (_) {
+    return undefined;
+  }
+}
+
+function refreshPage() {
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) win.webContents.reloadIgnoringCache();
+}
 
 /**
  * Run the iCloud Electron app with the given config.
@@ -33,141 +60,76 @@ const { setupAutoUpdater } = require('./updater');
  */
 function run(config) {
   const { appName, protocol, icloudUrl, splashPath, iconPath, removeToolbar = false } = config;
-  const store = createStore();
-  const isQuittingRef = { current: false };
-  let startMinimised = true;
-  let checkForUpdates = () => {};
+  const store = createIcloudStore();
 
-  function windowOpts() {
-    return { store, icloudUrl, startMinimised, isQuittingRef, removeToolbar };
+  function readSettings() {
+    return {
+      ...readCommonSettings(store),
+      startMinimised: !!store.get('startMinimised', true)
+    };
   }
 
-  function readStartMinimised() {
-    return getStartMinimised(store);
+  function writeSettings(partial = {}) {
+    applyCommonSettings(store, partial);
+    return readSettings();
   }
 
-  function writeStartMinimised(value) {
-    setStartMinimised(store, value);
-    syncLoginItemArgs(readStartMinimised);
-    updateTrayMenu(buildTrayMenuInstance());
-  }
-
-  function buildTrayMenuInstance() {
-    return buildTrayMenu({
-      appName,
-      getStartMinimised: readStartMinimised,
-      setStartMinimised: writeStartMinimised,
-      onShow: () => {
-        const win = getMainWindow();
-        if (!win) {
-          createWindow(windowOpts());
-          return;
-        }
-        win.show();
-      },
-      onRefresh: () => refreshPage(),
-      onCheckUpdates: () => checkForUpdates(true),
-      onQuit: () => {
-        isQuittingRef.current = true;
-        app.quit();
-      }
-    });
-  }
-
-  const gotTheLock = app.requestSingleInstanceLock();
-  if (!gotTheLock) {
-    app.quit();
-    return;
-  }
-
-  app.on('second-instance', (_event, argv) => {
-    const win = getMainWindow();
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      if (!win.isVisible()) win.show();
-      win.focus();
-    }
-    handleProtocolUrl(argv.find((a) => a.startsWith(`${protocol}://`)));
-  });
-
-  function handleProtocolUrl(url) {
-    if (!url || !getMainWindow()) return;
-    showMainWindow();
-    getMainWindow().focus();
-  }
-
-  app.setAsDefaultProtocolClient(protocol);
-
-  app.on('ready', () => {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'));
-      if (pkg.build?.appId) app.setAppUserModelId(pkg.build.appId);
-    } catch (_) { /* ignore */ }
-
-    startMinimised = readStartMinimised();
-    syncLoginItemArgs(readStartMinimised);
-
-    if (!startMinimised) createSplash(splashPath);
-    createWindow(windowOpts());
-
-    createTray({
-      appName,
-      iconPath,
-      menu: buildTrayMenuInstance()
-    });
-
-    setTrayClickHandler(() => {
-      const win = getMainWindow();
-      if (!win) {
-        createWindow(windowOpts());
-        return;
-      }
-      win.isVisible() ? win.hide() : win.show();
-    });
-
-    app.setJumpList([]);
-
-    ({ checkForUpdates } = setupAutoUpdater({
-      onQuitForInstall: () => {
-        isQuittingRef.current = true;
-      }
-    }));
-
-    setupSleepResumeRefresh();
-  });
-
-  app.on('open-url', (event, url) => {
-    event.preventDefault();
-    handleProtocolUrl(url);
-  });
-
-  app.on('window-all-closed', (event) => {
-    if (!isQuittingRef.current) event.preventDefault();
-  });
-
-  function flushPersistedCookies() {
+  async function flushPersistedCookies() {
     const ses = session.fromPartition('persist:icloud');
-    return savePersistedCookies(ses).then(() => ses.cookies.flushStore());
+    await savePersistedCookies(ses);
+    await ses.cookies.flushStore();
   }
 
-  // Windows fires this before shutdown/restart — before-quit often does not run.
-  powerMonitor.on('shutdown', () => {
-    flushPersistedCookies().catch(() => {});
-  });
-
-  let flushOnQuitStarted = false;
-  app.on('before-quit', (event) => {
-    isQuittingRef.current = true;
-    if (flushOnQuitStarted) return;
-    flushOnQuitStarted = true;
-    // Electron does not await async before-quit handlers; block quit until cookies flush.
-    event.preventDefault();
-    flushPersistedCookies()
-      .catch(() => {})
-      .finally(() => {
+  trayBase.run({
+    appName,
+    protocol,
+    iconPath,
+    splashPath,
+    store: { instance: store },
+    dev: { reloader: false },
+    loginItem: { syncOnReady: true },
+    updater: { silent: true },
+    window: {
+      loadURL: icloudUrl,
+      defaultBounds: { width: 1280, height: 800 },
+      webPreferences: { partition: 'persist:icloud' }
+    },
+    tray: {
+      onClick: 'toggle',
+      showHide: false,
+      showAlwaysOnTop: false,
+      extraSections: () => [[{ label: 'Refresh', click: refreshPage }]]
+    },
+    sleep: {
+      onResume: (win) => {
+        if (win && !win.isDestroyed()) win.webContents.reloadIgnoringCache();
+      }
+    },
+    hooks: {
+      getSettings: readSettings,
+      setSettings: writeSettings,
+      onWindowCreated: async (win, ctx) => {
+        await setupIcloudWebview(win, {
+          icloudUrl,
+          removeToolbar,
+          enableOpenAtLogin: ctx.enableOpenAtLogin
+        });
+      },
+      onReady: () => {
+        if (process.platform === 'win32') {
+          const appId = readAppId();
+          if (appId) app.setAppUserModelId(appId);
+        }
+        app.setJumpList([]);
+        powerMonitor.on('shutdown', () => {
+          flushPersistedCookies().catch(() => {});
+        });
+      },
+      onBeforeQuit: async () => {
+        await flushPersistedCookies();
         stopCookiePersistence();
-        app.exit(0);
-      });
+      }
+    }
   });
 }
 
