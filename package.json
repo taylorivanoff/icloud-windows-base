@@ -1,6 +1,6 @@
 {
   "name": "icloud-windows-base",
-  "version": "1.0.33",
+  "version": "1.0.34",
   "description": "Shared Electron wrapper for Windows web apps (tray, sessions, windows, updater).",
   "author": {
     "name": "Taylor Ivanoff"
@@ -16,6 +16,13 @@
     "electron": ">=43"
   },
   "scripts": {
-    "postinstall": "node -e \"try{require('fs').rmSync('node_modules/electron',{recursive:true,force:true});require('fs').rmSync('node_modules/@electron',{recursive:true,force:true})}catch(e){}\""
+    "postinstall": "node -e \"try{require('fs').rmSync('node_modules/electron',{recursive:true,force:true});require('fs').rmSync('node_modules/@electron',{recursive:true,force:true})}catch(e){}\"",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "globals": "^16.0.0",
+    "eslint": "^9.39.5"
   }
 }

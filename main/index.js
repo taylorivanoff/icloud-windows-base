@@ -1,8 +1,6 @@
 const { app, session, powerMonitor } = require('electron');
 const path = require('path');
-const fs = require('fs');
 const Store = require('electron-store');
-const { applyCommonSettings, readCommonSettings, getMainWindow } = require('electron-tray-base');
 const { savePersistedCookies, stopCookiePersistence } = require('./cookies');
 const { setupIcloudWebview } = require('./icloud-webview');
 
@@ -21,6 +19,14 @@ function loadElectronTrayBase() {
 }
 
 const trayBase = loadElectronTrayBase();
+const {
+  applyCommonSettings,
+  readCommonSettings,
+  getMainWindow,
+  configureAppIsolation,
+  sessionPartition,
+  readAppIdFromPackage
+} = trayBase;
 
 function createIcloudStore() {
   return new Store({
@@ -34,12 +40,7 @@ function createIcloudStore() {
 }
 
 function readAppId() {
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'));
-    return pkg.build?.appId;
-  } catch (_) {
-    return undefined;
-  }
+  return readAppIdFromPackage(app.getAppPath());
 }
 
 function refreshPage() {
@@ -56,10 +57,14 @@ function refreshPage() {
  *   splashPath: string;
  *   iconPath: string;
  *   removeToolbar?: boolean;
+ *   appId?: string;
  * }} config
  */
 function run(config) {
   const { appName, protocol, icloudUrl, splashPath, iconPath, removeToolbar = false } = config;
+  const appId = config.appId || readAppId();
+  configureAppIsolation({ appId, appName });
+  const partition = sessionPartition(appId);
   const store = createIcloudStore();
 
   function readSettings() {
@@ -75,13 +80,14 @@ function run(config) {
   }
 
   async function flushPersistedCookies() {
-    const ses = session.fromPartition('persist:icloud');
+    const ses = session.fromPartition(partition);
     await savePersistedCookies(ses);
     await ses.cookies.flushStore();
   }
 
   trayBase.run({
     appName,
+    appId,
     protocol,
     iconPath,
     splashPath,
@@ -92,7 +98,7 @@ function run(config) {
     window: {
       loadURL: icloudUrl,
       defaultBounds: { width: 1280, height: 800 },
-      webPreferences: { partition: 'persist:icloud' }
+      webPreferences: { partition }
     },
     tray: {
       onClick: 'toggle',
@@ -116,10 +122,6 @@ function run(config) {
         });
       },
       onReady: () => {
-        if (process.platform === 'win32') {
-          const appId = readAppId();
-          if (appId) app.setAppUserModelId(appId);
-        }
         app.setJumpList([]);
         powerMonitor.on('shutdown', () => {
           flushPersistedCookies().catch(() => {});

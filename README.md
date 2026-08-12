@@ -84,7 +84,7 @@ Apps built on this package load **official Apple web UIs** in an Electron `Brows
 Each app README includes a [Security & authentication](docs/security-auth-snippet.md) section for end users. In short:
 
 - Sign-in happens on Apple-controlled pages (`icloud.com`, `apple.com`, etc.).
-- Session cookies for `icloud.com` and `apple.com` are persisted in partition `persist:icloud` and mirrored to each app’s own `%APPDATA%\<AppName>\cookies.json`. Apps do **not** share cookies (sharing caused open apps to refresh each other).
+- Session cookies for `icloud.com` and `apple.com` are persisted in an **appId-derived** session partition and mirrored to each app’s own `%APPDATA%/<appId>/cookies.json`. Apps do **not** share cookies (sharing caused open apps to refresh each other).
 - Apple often issues auth cookies **without an expiry** (browser session cookies). The base assigns a durable expiry when saving so they survive app quit and PC restart.
 - `electron-store` holds only UI preferences (window bounds, tray options)—never Apple ID credentials.
 - `nodeIntegration: false` in the web view; external links open via `shell.openExternal`.
@@ -93,7 +93,7 @@ Each app README includes a [Security & authentication](docs/security-auth-snippe
 
 | Mechanism | Location in `index.js` |
 |-----------|------------------------|
-| Load cookies on startup | `loadPersistedCookies()` → `persist:icloud` |
+| Load cookies on startup | `loadPersistedCookies()` → appId-derived session partition |
 | Save cookies on change / quit | `scheduleSavePersistedCookies()`, `ses.cookies.on('changed')`, blocking `before-quit` flush |
 | Save before PC restart | `powerMonitor.on('shutdown')` |
 | Cookie file (per app) | `%APPDATA%\<AppName>\cookies.json` |

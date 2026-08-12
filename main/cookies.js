@@ -2,8 +2,10 @@ const path = require('path');
 const fs = require('fs');
 const { app } = require('electron');
 
-/** Per-app cookie file (avoids sibling apps refreshing each other). */
-const cookiePath = path.join(app.getPath('userData'), 'cookies.json');
+/** Per-app cookie file (resolved lazily so configureAppIsolation runs first). */
+function getCookiePath() {
+  return path.join(app.getPath('userData'), 'cookies.json');
+}
 /** Legacy shared path — one-time migrate into this app's userData, then ignore. */
 const legacySharedCookiePath = path.join(app.getPath('appData'), 'icloud-shared', 'cookies.json');
 
@@ -103,6 +105,7 @@ async function applyCookies(ses, cookies) {
 
 async function loadPersistedCookies(ses) {
   try {
+    const cookiePath = getCookiePath();
     let cookies = readCookieFile(cookiePath);
     let migratedFromLegacy = false;
     if (!cookies) {
@@ -125,6 +128,7 @@ async function loadPersistedCookies(ses) {
 async function savePersistedCookies(ses) {
   if (applyingPersisted) return;
   try {
+    const cookiePath = getCookiePath();
     const cookiesToSave = (await getAppleFamilyCookies(ses)).map(serializeCookie);
     const nextFingerprint = fingerprint(cookiesToSave);
     if (nextFingerprint === lastSavedFingerprint) return;
@@ -160,7 +164,7 @@ function isApplyingPersistedCookies() {
 }
 
 module.exports = {
-  cookiePath,
+  getCookiePath,
   loadPersistedCookies,
   savePersistedCookies,
   scheduleSavePersistedCookies,
@@ -168,7 +172,9 @@ module.exports = {
   isApplyingPersistedCookies,
   isAppleFamilyDomain,
   // Back-compat aliases (previous shared-cookie API)
-  sharedCookiePath: cookiePath,
+  get cookiePath() {
+    return getCookiePath();
+  },
   loadSharedCookies: loadPersistedCookies,
   saveSharedCookies: savePersistedCookies,
   scheduleSaveSharedCookies: scheduleSavePersistedCookies,
