@@ -3,7 +3,11 @@ const { START_MINIMIZED_ARG } = require('./constants');
 
 function hasStartMinimizedArg(argv = process.argv) {
   return argv.some(
-    (arg) => arg === START_MINIMIZED_ARG || arg.startsWith(`${START_MINIMIZED_ARG}=`)
+    (arg) =>
+      arg === '--start-minimized'
+      || arg.startsWith('--start-minimized=')
+      || arg === '--start-minimised'
+      || arg.startsWith('--start-minimised=')
   );
 }
 
