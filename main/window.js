@@ -1,8 +1,13 @@
 const { BrowserWindow, shell, powerMonitor } = require('electron');
 const { SAFARI_UA } = require('./constants');
-const { loadSharedCookies, saveSharedCookies } = require('./cookies');
+const {
+  loadPersistedCookies,
+  scheduleSavePersistedCookies,
+  isApplyingPersistedCookies,
+  isAppleFamilyDomain
+} = require('./cookies');
 const { getWindowBounds, saveWindowBounds } = require('./store');
-const { enableOpenAtLogin, wasLaunchedMinimised } = require('./login');
+const { enableOpenAtLogin } = require('./login');
 const { removeIcloudToolbar } = require('./toolbar');
 
 let mainWindow = null;
@@ -80,10 +85,10 @@ function showMainWindow() {
 async function createWindow({
   store,
   icloudUrl,
+  startMinimised,
   isQuittingRef,
   removeToolbar = false
 }) {
-  const launchedMinimised = wasLaunchedMinimised();
   if (mainWindow) return;
   const bounds = getWindowBounds(store);
   const appTarget = parseAppTarget(icloudUrl);
@@ -95,7 +100,7 @@ async function createWindow({
   });
 
   const ses = mainWindow.webContents.session;
-  await loadSharedCookies(ses);
+  await loadPersistedCookies(ses);
 
   ses.webRequest.onBeforeSendHeaders((details, callback) => {
     details.requestHeaders['User-Agent'] = SAFARI_UA;
@@ -118,15 +123,15 @@ async function createWindow({
       splashWindow.destroy();
       splashWindow = null;
     }
-    if (!launchedMinimised) mainWindow.show();
+    if (!startMinimised) mainWindow.show();
   });
 
   ses.cookies.on('changed', (_event, cookie, _cause, removed) => {
-    if (cookie.domain?.includes('icloud.com') || cookie.domain?.includes('apple.com')) {
-      saveSharedCookies(ses);
-      if (!removed && cookie.name === 'X-APPLE-WEBAUTH-LOGIN') {
-        enableOpenAtLogin(() => store.get('startMinimised', true));
-      }
+    if (isApplyingPersistedCookies()) return;
+    if (!isAppleFamilyDomain(cookie?.domain)) return;
+    scheduleSavePersistedCookies(ses);
+    if (!removed && cookie.name === 'X-APPLE-WEBAUTH-LOGIN') {
+      enableOpenAtLogin(() => store.get('startMinimised', true));
     }
   });
 

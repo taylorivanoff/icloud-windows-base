@@ -1,9 +1,9 @@
-const { app, session } = require('electron');
+const { app, session, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { createStore, getStartMinimised, setStartMinimised } = require('./store');
-const { saveSharedCookies } = require('./cookies');
-const { syncLoginItemArgs, wasLaunchedMinimised, hasStartMinimizedArg } = require('./login');
+const { savePersistedCookies, stopCookiePersistence } = require('./cookies');
+const { syncLoginItemArgs } = require('./login');
 const {
   createSplash,
   createWindow,
@@ -13,7 +13,6 @@ const {
   showMainWindow
 } = require('./window');
 const {
-  notifyUpdateFound,
   buildTrayMenu,
   createTray,
   updateTrayMenu,
@@ -36,10 +35,11 @@ function run(config) {
   const { appName, protocol, icloudUrl, splashPath, iconPath, removeToolbar = false } = config;
   const store = createStore();
   const isQuittingRef = { current: false };
+  let startMinimised = true;
   let checkForUpdates = () => {};
 
   function windowOpts() {
-    return { store, icloudUrl, isQuittingRef, removeToolbar };
+    return { store, icloudUrl, startMinimised, isQuittingRef, removeToolbar };
   }
 
   function readStartMinimised() {
@@ -50,11 +50,6 @@ function run(config) {
     setStartMinimised(store, value);
     syncLoginItemArgs(readStartMinimised);
     updateTrayMenu(buildTrayMenuInstance());
-    // Unchecking while hidden should feel immediate, not only after next boot.
-    if (!value) {
-      const win = getMainWindow();
-      if (win && !win.isDestroyed() && !win.isVisible()) win.show();
-    }
   }
 
   function buildTrayMenuInstance() {
@@ -86,8 +81,6 @@ function run(config) {
   }
 
   app.on('second-instance', (_event, argv) => {
-    // Duplicate login launches pass --start-minimized; keep the existing tray instance hidden.
-    if (hasStartMinimizedArg(argv)) return;
     const win = getMainWindow();
     if (win) {
       if (win.isMinimized()) win.restore();
@@ -111,9 +104,10 @@ function run(config) {
       if (pkg.build?.appId) app.setAppUserModelId(pkg.build.appId);
     } catch (_) { /* ignore */ }
 
+    startMinimised = readStartMinimised();
     syncLoginItemArgs(readStartMinimised);
 
-    if (!wasLaunchedMinimised()) createSplash(splashPath);
+    if (!startMinimised) createSplash(splashPath);
     createWindow(windowOpts());
 
     createTray({
@@ -134,7 +128,6 @@ function run(config) {
     app.setJumpList([]);
 
     ({ checkForUpdates } = setupAutoUpdater({
-      onUpdateFound: (version) => notifyUpdateFound(appName, iconPath, version),
       onQuitForInstall: () => {
         isQuittingRef.current = true;
       }
@@ -152,11 +145,29 @@ function run(config) {
     if (!isQuittingRef.current) event.preventDefault();
   });
 
-  app.on('before-quit', async () => {
-    isQuittingRef.current = true;
+  function flushPersistedCookies() {
     const ses = session.fromPartition('persist:icloud');
-    await saveSharedCookies(ses);
-    await ses.cookies.flushStore();
+    return savePersistedCookies(ses).then(() => ses.cookies.flushStore());
+  }
+
+  // Windows fires this before shutdown/restart — before-quit often does not run.
+  powerMonitor.on('shutdown', () => {
+    flushPersistedCookies().catch(() => {});
+  });
+
+  let flushOnQuitStarted = false;
+  app.on('before-quit', (event) => {
+    isQuittingRef.current = true;
+    if (flushOnQuitStarted) return;
+    flushOnQuitStarted = true;
+    // Electron does not await async before-quit handlers; block quit until cookies flush.
+    event.preventDefault();
+    flushPersistedCookies()
+      .catch(() => {})
+      .finally(() => {
+        stopCookiePersistence();
+        app.exit(0);
+      });
   });
 }
 

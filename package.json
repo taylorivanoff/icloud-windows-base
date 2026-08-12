@@ -1,6 +1,6 @@
 {
   "name": "icloud-windows-base",
-  "version": "1.0.26",
+  "version": "1.0.27",
   "description": "Shared Electron wrapper for Windows web apps (tray, sessions, windows, updater).",
   "author": {
     "name": "Taylor Ivanoff"

@@ -1,15 +1,6 @@
-const { app, Tray, Menu, nativeImage, Notification } = require('electron');
+const { app, Tray, Menu, nativeImage } = require('electron');
 
 let tray = null;
-
-function notifyUpdateFound(appName, iconPath, version) {
-  if (!Notification.isSupported()) return;
-  new Notification({
-    title: appName,
-    body: `Update ${version} found. The app will update and restart.`,
-    icon: iconPath
-  }).show();
-}
 
 function buildTrayMenu({ appName, getStartMinimised, setStartMinimised, onShow, onRefresh, onCheckUpdates, onQuit }) {
   return Menu.buildFromTemplate([
@@ -47,7 +38,6 @@ function setTrayClickHandler(onClick) {
 }
 
 module.exports = {
-  notifyUpdateFound,
   buildTrayMenu,
   createTray,
   updateTrayMenu,

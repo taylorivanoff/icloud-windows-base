@@ -42,7 +42,7 @@ Keep in each app: `splash.html`, `icon.png`, `installer.nsh`, and app-specific `
 | `main/index.js` | App lifecycle orchestration (`run()`) |
 | `main/window.js` | BrowserWindow, navigation guard, sleep refresh |
 | `main/toolbar.js` | Remove iCloud in-page toolbar (DOM + MutationObserver) |
-| `main/cookies.js` | Shared Apple session cookies across apps |
+| `main/cookies.js` | Per-app Apple session cookie persistence |
 | `main/store.js` | Window bounds and tray preferences |
 | `main/login.js` | Windows startup login item |
 | `main/tray.js` | System tray menu |
@@ -85,7 +85,8 @@ Apps built on this package load **official Apple web UIs** in an Electron `Brows
 Each app README includes a [Security & authentication](docs/security-auth-snippet.md) section for end users. In short:
 
 - Sign-in happens on Apple-controlled pages (`icloud.com`, `apple.com`, etc.).
-- Session cookies for `icloud.com` and `apple.com` are persisted in partition `persist:icloud` and mirrored to `%APPDATA%\icloud-shared\cookies.json` so all apps in this family share one sign-in on the same Windows user account.
+- Session cookies for `icloud.com` and `apple.com` are persisted in partition `persist:icloud` and mirrored to each app’s own `%APPDATA%\<AppName>\cookies.json`. Apps do **not** share cookies (sharing caused open apps to refresh each other).
+- Apple often issues auth cookies **without an expiry** (browser session cookies). The base assigns a durable expiry when saving so they survive app quit and PC restart.
 - `electron-store` holds only UI preferences (window bounds, tray options)—never Apple ID credentials.
 - `nodeIntegration: false` in the web view; external links open via `shell.openExternal`.
 
@@ -93,16 +94,16 @@ Each app README includes a [Security & authentication](docs/security-auth-snippe
 
 | Mechanism | Location in `index.js` |
 |-----------|------------------------|
-| Load shared cookies on startup | `loadSharedCookies()` → `persist:icloud` |
-| Save cookies on change / quit | `saveSharedCookies()`, `ses.cookies.on('changed')`, `before-quit` |
-| Shared cookie file | `%APPDATA%\icloud-shared\cookies.json` |
-| Domains synced | `icloud.com`, `apple.com` only |
+| Load cookies on startup | `loadPersistedCookies()` → `persist:icloud` |
+| Save cookies on change / quit | `scheduleSavePersistedCookies()`, `ses.cookies.on('changed')`, blocking `before-quit` flush |
+| Save before PC restart | `powerMonitor.on('shutdown')` |
+| Cookie file (per app) | `%APPDATA%\<AppName>\cookies.json` |
+| Domains persisted | `icloud.com`, `apple.com` (and subdomains) |
 | Start at Windows login | Enabled after `X-APPLE-WEBAUTH-LOGIN` cookie is set |
-| Start minimised | Tray toggle sets login-item `--start-minimized`; manual launches always show the window |
 
 Cookies are written to disk as JSON and are only as protected as the Windows user profile. Apps do not transmit session data to the package author or third parties—requests go to Apple the same way they would from a browser using those cookies.
 
-To sign out on a machine, users should use Apple's web **Sign Out** or delete the shared cookie file and quit all related apps.
+To sign out, users should use Apple's web **Sign Out** or delete that app’s `cookies.json` under its `%APPDATA%` folder and quit the app.
 
 ## Keywords
 
